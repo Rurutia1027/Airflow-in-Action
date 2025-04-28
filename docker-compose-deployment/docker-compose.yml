@@ -1,0 +1,78 @@
+version: "3" # Docker Compose file format version
+
+services:
+  postgres:
+    # PostgreSQL service for Airflow metadata database
+    image: postgres:13
+    # Name of the container
+    container_name: airflow_postgres
+    # Always restart the container if it stops
+    restart: always
+    environment:
+      # Username for the database
+      POSTGRES_USER: airflow
+      # Password for the database
+      POSTGRES_PASSWORD: airflow
+      # Name of the database
+      POSTGRES_DB: airflow
+    ports:
+      # Expose PostgreSQL on localhost:5432
+      - "5432:5432"
+    volumes:
+      # Persist database data on a named volume
+      - postgres_data:/var/lib/postgresql/data
+
+  airflow-webserver:
+    # Airflow Webserver service
+    image: apache/airflow:2.8.1
+    # Name of the container
+    container_name: airflow_webserver
+    # Always restart the container if it stops
+    restart: always
+    depends_on:
+      # Start postgres before starting this service
+      - postgres
+    environment:
+      # Use LocalExecutor
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      # Database connection string
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      # Fernet key for encrypting connections (should be set securely)
+      AIRFLOW__CORE__FERNET_KEY: ""
+      # Secret key for session management
+      AIRFLOW__WEBSERVER__SECRET_KEY: mysecretkey
+      # Allow configuration to be viewed from the UI
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
+    ports:
+      # Expose Airflow webserver on localhost:8080
+      - "8080:8080"
+    command: webserver
+    volumes:
+      # Mount local `dags` folder to Airflow dags folder
+      - ./dags:/opt/airflow/dags
+
+  airflow-scheduler:
+    # Airflow Scheduler service
+    image: apache/airflow:2.8.1
+    # Name of the container
+    container_name: airflow_scheduler
+    # Always restart the container if it stops
+    restart: always
+    depends_on:
+      # Start postgres before starting this service
+      - postgres
+    environment:
+      # Use LocalExecutor
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      # Database connection string
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      # Fernet key (should be securely set)
+      AIRFLOW__CORE__FERNET_KEY: ""
+    command: scheduler
+    volumes:
+      # Mount local `dags` folder to Airflow dags folder
+      - ./dags:/opt/airflow/dags
+
+volumes:
+  # Named volume to persist PostgreSQL data
+  postgres_data:
